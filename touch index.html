@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schema Progress Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--gray-200);
+        }
+
+        .stat-title {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin: 0.5rem 0;
+        }
+
+        .trend {
+            display: flex;
+            align-items: center;
+            font-size: 0.875rem;
+            color: var(--success);
+            gap: 0.25rem;
+        }
+
+        .trend-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--gray-200);
+            margin-bottom: 1.5rem;
+            gap: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            border: none;
+            background: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .tab:after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+            transform: scaleX(0);
+            transition: transform 0.2s ease;
+        }
+
+        .tab.active {
+            color: var(--primary);
+        }
+
+        .tab.active:after {
+            transform: scaleX(1);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-input {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            gap: 0.5rem;
+        }
+
+        .button-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: var(--primary-light);
+        }
+
+        .button-secondary {
+            background: var(--gray-100);
+            color: var(--gray-800);
+        }
+
+        .button-secondary:hover {
+            background: var(--gray-200);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 1rem;
+            }
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .table th {
+            background: var(--gray-50);
+            font-weight: 500;
+            color: var(--gray-600);
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .toggle-button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid var(--gray-200);
+            background: white;
+        }
+
+        .toggle-button.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body></body>
+    <div class="container">
+        <h1 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 2rem;">Schema Progress Tracker</h1>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-title">Trust Building Score</span>
+                <div class="stat-value" id="trustScore">0%</div>
+                <div class="trend" id="trustTrend">
+                    <svg class="trend-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                    </svg>
+                    <span>+0% this week</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-title">Criticism Management</span>
+                <div class="stat-value" id="criticismScore">0%</div>
+                <div class="trend" id="criticismTrend">
+                    <svg class="trend-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                    </svg>
+                    <span>+0% this week</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-title">Weekly Actions</span>
+                <div class="stat-value" id="actionsCompleted">0/14</div>
+                <div class="trend">Target: 14 per week</div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-title">Success Rate</span>
+                <div class="stat-value" id="successRate">0%</div>
+                <div class="trend">Based on outcomes</div>
+            </div>
+        </div>
+
+        <!-- Time Period Toggle -->
+        <div class="toggle-group">
+            <button class="toggle-button active" onclick="setTimePeriod('weekly')" id="weeklyToggle">Weekly View</button>
+            <button class="toggle-button" onclick="setTimePeriod('monthly')" id="monthlyToggle">Monthly Overview</button>
+        </div>
+
+        <!-- Progress Charts -->
+        <div class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Progress Over Time</h2>
+            <div class="chart-container">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Main Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('trust')" data-tab="trust">Trust Building</button>
+            <button class="tab" onclick="showTab('criticism')" data-tab="criticism">Criticism Management</button>
+            <button class="tab" onclick="showTab('analysis')" data-tab="analysis">Analysis</button>
+            <button class="button button-secondary" onclick="exportData()" style="margin-left: auto;">Export Data</button>
+        </div>
+
+        <!-- Trust Building Form -->
+        <div id="trust" class="tab-content">
+            <form id="trustForm" onsubmit="handleTrustSubmit(event)" class="card">
+                <div class="grid">
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trust Action Category</label>
+                        <select name="category" required class="form-input">
+                            <option value="sharing-vulnerability">Sharing Vulnerability</option>
+                            <option value="delegating">Delegating Responsibility</option>
+                            <option value="accepting-help">Accepting Help</option>
+                            <option value="expressing-needs">Expressing Needs Directly</option>
+                            <option value="setting-boundaries">Setting Boundaries</option>
+                            <option value="giving-control">Giving Control to Others</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Trust Action Description</label>
+                    <textarea name="action" required class="form-input" rows="3" 
+                             placeholder="What trust-building action did you take?"></textarea>
+                </div>
+
+                <div class="grid">
+                    <div class="form-group">
+                        <label class="form-label">Initial Worry Level (1-10)</label>
+                        <input type="number" name="worryLevel" min="1" max="10" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expected Difficulty (1-10)</label>
+                        <input type="number" name="expectedDifficulty" min="1" max="10" required class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Specific Fears or Concerns</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="fears" value="rejection" class="checkbox-input">
+                            <label>Fear of rejection</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="fears" value="taken-advantage" class="checkbox-input">
+                            <label>Fear of being taken advantage of</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="fears" value="incompetent" class="checkbox-input">
+                            <label>Fear of looking incompetent</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="fears" value="control" class="checkbox-input">
+                            <label>Fear of losing control</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="fears" value="disappointment" class="checkbox-input">
+                            <label>Fear of disappointment</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="form-group">
+                        <label class="form-label">Actual Outcome Rating (1-10)</label>
+                        <input type="number" name="outcomeRating" min="1" max="10" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Other Person's Response (1-10)</label>
+                        <input type="number" name="otherResponse" min="1" max="10" required class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Were Your Fears Justified?</label>
+                    <select name="fearsJustified" required class="form-input">
+                        <option value="no">No - fears were unfounded</option>
+                        <option value="partially">Partially - some concerns were valid</option>
+                        <option value="yes">Yes - fears were justified</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Confidence Impact</label>
+                    <select name="confidenceImpact" required class="form-input">
+                        <option value="increased">Increased confidence in trusting</option>
+                        <option value="neutral">No change in confidence</option>
+                        <option value="decreased">Decreased confidence</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="button button-primary">Log Trust Action</button>
+            </form>
+        </div>
+
+        <!-- Criticism Management Form -->
+        <div id="criticism" class="tab-content" style="display: none;">
+            <form id="criticismForm" onsubmit="handleCriticismSubmit(event)" class="card">
+                <div class="grid">
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trigger Type</label>
+                        <select name="triggerType" required class="form-input">
+                            <option value="home-chores">Home/Chores</option>
+                            <option value="work-related">Work-related</option>
+                            <option value="communication">Communication</option>
+                            <option value="time-management">Time Management</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Trigger Situation</label>
+                    <input type="text" name="trigger" required class="form-input" 
+                           placeholder="What triggered the urge to criticize?">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Urge Level (1-10)</label>
+                    <input type="number" name="urgeLevel" min="1" max="10" required class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Did you pause?</label>
+                    <select name="didPause" required class="form-input">
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Response Techniques Used</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="techniques" value="i-notice" class="checkbox-input">
+                            <label>"I notice" statements</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="techniques" value="delayed" class="checkbox-input">
+                            <label>Delayed response</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="techniques" value="questions" class="checkbox-input">
+                            <label>Asked questions instead</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="techniques" value="other" class="checkbox-input">
+                            <label>Other technique</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Alternative Response</label>
+                    <textarea name="alternative" rows="3" required class="form-input" 
+                              placeholder="What did you do instead?"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Partner's Response (1-10)</label>
+                    <input type="number" name="partnerResponse" min="1" max="10" required class="form-input">
+                </div>
+
+                <button type="submit" class="button button-primary">Log Criticism Event</button>
+            </form>
+        </div>
+
+        <!-- Analysis View -->
+        <div id="analysis" class="tab-content" style="display: none;">
+            <div class="grid">
+                <div class="card">
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Trust Building Analysis</h3>
+                    <div class="chart-container">
+                        <canvas id="trustAnalysisChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Criticism Management Analysis</h3>
+                    <div class="chart-container">
+                        <canvas id="criticismAnalysisChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="margin-top: 1rem;">
+                <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Weekly Progress</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Week</th>
+                            <th>Trust Score</th>
+                            <th>Criticism Score</th>
+                            <th>Combined Score</th>
+                            <th>Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyProgressTable">
+                        <!-- Filled by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    // Initialize data storage
+    let trustEntries = JSON.parse(localStorage.getItem('trustEntries')) || [];
+    let criticismEntries = JSON.parse(localStorage.getItem('criticismEntries')) || [];
+    let currentView = 'weekly';
+    let progressChart, trustAnalysisChart, criticismAnalysisChart;
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeCharts();
+        updateDashboard();
+        // Set today's date as default for forms
+        document.querySelectorAll('input[type="date"]').forEach(input => {
+            input.valueAsDate = new Date();
+        });
+    });
+
+    function initializeCharts() {
+        // Main progress chart
+        const progressCtx = document.getElementById('progressChart').getContext('2d');
+        progressChart = new Chart(progressCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Trust Building',
+                    borderColor: 'rgb(79, 70, 229)',
+                    data: [],
+                    tension: 0.4
+                }, {
+                    label: 'Criticism Management',
+                    borderColor: 'rgb(16, 185, 129)',
+                    data: [],
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Trust Analysis Chart
+        const trustCtx = document.getElementById('trustAnalysisChart').getContext('2d');
+        trustAnalysisChart = new Chart(trustCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Worry vs Outcome', 'Fear Justification', 'Confidence Impact'],
+                datasets: [{
+                    label: 'Average Scores',
+                    backgroundColor: 'rgba(79, 70, 229, 0.8)',
+                    data: []
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        // Criticism Analysis Chart
+        const criticismCtx = document.getElementById('criticismAnalysisChart').getContext('2d');
+        criticismAnalysisChart = new Chart(criticismCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Pause Rate', 'Technique Usage', 'Partner Response'],
+                datasets: [{
+                    label: 'Success Metrics',
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    data: []
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    function setTimePeriod(period) {
+        currentView = period;
+        document.querySelectorAll('.toggle-button').forEach(btn => {
+            btn.classList.toggle('active', btn.id === `${period}Toggle`);
+        });
+        updateDashboard();
+    }
+
+    function calculateTrustScore(entries) {
+        if (!entries || entries.length === 0) return { score: 0, trend: 0 };
+
+        const recentEntries = entries.slice(-7);
+        const previousEntries = entries.slice(-14, -7);
+
+        // Calculate various components
+        const worryVsOutcome = recentEntries.reduce((acc, entry) => {
+            return acc + (entry.outcomeRating - entry.worryLevel);
+        }, 0) / recentEntries.length;
+
+        const confidenceImpact = recentEntries.reduce((acc, entry) => {
+            return acc + (entry.confidenceImpact === 'increased' ? 1 : 
+                         entry.confidenceImpact === 'decreased' ? -1 : 0);
+        }, 0) / recentEntries.length;
+
+        const fearsJustified = recentEntries.reduce((acc, entry) => {
+            return acc + (entry.fearsJustified === 'no' ? 1 : 
+                         entry.fearsJustified === 'partially' ? 0.5 : 0);
+        }, 0) / recentEntries.length;
+
+        // Weighted score calculation
+        const score = Math.round(
+            (worryVsOutcome * 0.4 + confidenceImpact * 0.3 + fearsJustified * 0.3) * 100
+        );
+
+        // Calculate trend
+        const previousScore = calculatePreviousTrustScore(previousEntries);
+        const trend = score - previousScore;
+
+        return { score, trend };
+    }
+
+    function calculatePreviousTrustScore(entries) {
+        if (!entries || entries.length === 0) return 0;
+        
+        const worryVsOutcome = entries.reduce((acc, entry) => {
+            return acc + (entry.outcomeRating - entry.worryLevel);
+        }, 0) / entries.length;
+
+        return Math.round(worryVsOutcome * 100);
+    }
+
+    function calculateCriticismScore(entries) {
+        if (!entries || entries.length === 0) return { score: 0, trend: 0 };
+
+        const recentEntries = entries.slice(-7);
+        const previousEntries = entries.slice(-14, -7);
+
+        // Calculate components
+        const pauseRate = recentEntries.filter(entry => entry.didPause === 'yes').length / recentEntries.length;
+        
+        const techniqueUsage = recentEntries.reduce((acc, entry) => {
+            return acc + (entry.techniques ? entry.techniques.length : 0);
+        }, 0) / recentEntries.length;
+
+        const partnerResponse = recentEntries.reduce((acc, entry) => {
+            return acc + (entry.partnerResponse || 5);
+        }, 0) / recentEntries.length;
+
+        // Weighted score calculation
+        const score = Math.round(
+            (pauseRate * 0.4 + (techniqueUsage/3) * 0.3 + (partnerResponse/10) * 0.3) * 100
+        );
+
+        // Calculate trend
+        const previousScore = calculatePreviousCriticismScore(previousEntries);
+        const trend = score - previousScore;
+
+        return { score, trend };
+    }
+
+    function calculatePreviousCriticismScore(entries) {
+        if (!entries || entries.length === 0) return 0;
+        const pauseRate = entries.filter(entry => entry.didPause === 'yes').length / entries.length;
+        return Math.round(pauseRate * 100);
+    }
+
+    function updateDashboard() {
+        // Calculate scores
+        const trustMetrics = calculateTrustScore(trustEntries);
+        const criticismMetrics = calculateCriticismScore(criticismEntries);
+
+        // Update score displays
+        document.getElementById('trustScore').textContent = `${trustMetrics.score}%`;
+        document.getElementById('criticismScore').textContent = `${criticismMetrics.score}%`;
+        
+        // Update trends
+        updateTrendDisplay('trustTrend', trustMetrics.trend);
+        updateTrendDisplay('criticismTrend', criticismMetrics.trend);
+
+        // Update weekly actions
+        const weeklyActions = getWeeklyActionCount();
+        document.getElementById('actionsCompleted').textContent = `${weeklyActions}/14`;
+
+        // Update success rate
+        const successRate = calculateSuccessRate();
+        document.getElementById('successRate').textContent = `${successRate}%`;
+
+        // Update charts
+        updateCharts();
+        
+        if (document.getElementById('analysis').style.display !== 'none') {
+            updateAnalysis();
+        }
+    }
+
+    function updateTrendDisplay(elementId, trend) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `
+            <svg class="trend-icon" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5.293 ${trend >= 0 ? '9.707' : '7.293'} a1 1 0 0${trend >= 0 ? '1' : '0'}-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 ${trend >= 0 ? '7.414' : '9.586'}V15a1 1 0 11-2 0V${trend >= 0 ? '7.414' : '9.586'}L6.707 ${trend >= 0 ? '9.707' : '7.293'}a1 1 0 01-1.414 0z"/>
+            </svg>
+            <span>${trend >= 0 ? '+' : ''}${trend}% this week</span>
+        `;
+        element.style.color = trend >= 0 ? 'var(--success)' : 'var(--error)';
+    }
+
+    function getWeeklyActionCount() {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        
+        const recentTrust = trustEntries.filter(entry => 
+            new Date(entry.date) > oneWeekAgo
+        ).length;
+        const recentCriticism = criticismEntries.filter(entry => 
+            new Date(entry.date) > oneWeekAgo
+        ).length;
+        
+        return recentTrust + recentCriticism;
+    }
+
+    function calculateSuccessRate() {
+        const recentTrust = trustEntries.slice(-7);
+        const recentCriticism = criticismEntries.slice(-7);
+        
+        if (recentTrust.length === 0 && recentCriticism.length === 0) return 0;
+        
+        const successfulTrust = recentTrust.filter(entry => 
+            entry.outcomeRating > entry.worryLevel
+        ).length;
+        const successfulCriticism = recentCriticism.filter(entry => 
+            entry.didPause === 'yes'
+        ).length;
+        
+        return Math.round(
+            ((successfulTrust + successfulCriticism) / 
+             (recentTrust.length + recentCriticism.length)) * 100
+        );
+    }
+
+    function updateCharts() {
+        // Get dates for chart
+        const dates = getChartDates();
+        
+        // Update main progress chart
+        progressChart.data.labels = dates;
+        progressChart.data.datasets[0].data = dates.map(date => 
+            calculateTrustScore(trustEntries.filter(entry => entry.date <= date)).score
+        );
+        progressChart.data.datasets[1].data = dates.map(date =>
+            calculateCriticismScore(criticismEntries.filter(entry => entry.date <= date)).score
+        );
+        progressChart.update();
+
+        // Update analysis charts
+        updateAnalysisCharts();
+    }
+
+    function getChartDates() {
+        const allDates = [...new Set([
+            ...trustEntries.map(entry => entry.date),
+            ...criticismEntries.map(entry => entry.date)
+        ])];
+        allDates.sort();
+        return currentView === 'weekly' ? allDates.slice(-7) : allDates.slice(-30);
+    }
+
+    function updateAnalysisCharts() {
+        const recentTrust = trustEntries.slice(-7);
+        const recentCriticism = criticismEntries.slice(-7);
+
+        // Update trust analysis chart
+        if (recentTrust.length > 0) {
+            const worryVsOutcome = recentTrust.reduce((acc, entry) => 
+                acc + (entry.outcomeRating - entry.worryLevel), 0) / recentTrust.length;
+            const fearJustification = recentTrust.filter(entry => 
+                entry.fearsJustified === 'no').length / recentTrust.length;
+            const confidenceGain = recentTrust.filter(entry => 
+                entry.confidenceImpact === 'increased').length / recentTrust.length;
+
+            trustAnalysisChart.data.datasets[0].data = [
+                worryVsOutcome * 10,
+                fearJustification * 100,
+                confidenceGain * 100
+            ];
+            trustAnalysisChart.update();
+        }
+
+        // Update criticism analysis chart
+        if (recentCriticism.length > 0) {
+            const pauseRate = recentCriticism.filter(entry => 
+                entry.didPause === 'yes').length / recentCriticism.length;
+            const techniqueUsage = recentCriticism.reduce((acc, entry) => 
+                acc + (entry.techniques ? entry.techniques.length : 0), 0) / recentCriticism.length;
+            const avgPartnerResponse = recentCriticism.reduce((acc, entry) => 
+                acc + entry.partnerResponse, 0) / recentCriticism.length;
+
+            criticismAnalysisChart.data.datasets[0].data = [
+                pauseRate * 100,
+                techniqueUsage * 33.33,
+                avgPartnerResponse * 10
+            ];
+            criticismAnalysisChart.update();
+        }
+    }
+
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        document.getElementById(tabName).style.display = 'block';
+        
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.getAttribute('data-tab') === tabName) {
+                tab.classList.add('active');
+            }
+        });
+
+        if (tabName === 'analysis') {
+            updateAnalysis();
+        }
+    }
+
+    function handleTrustSubmit(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const entry = {
+            date: formData.get('date'),
+            category: formData.get('category'),
+            action: formData.get('action'),
+            worryLevel: parseInt(formData.get('worryLevel')),
+            expectedDifficulty: parseInt(formData.get('expectedDifficulty')),
+            fears: Array.from(formData.getAll('fears')),
+            outcomeRating: parseInt(formData.get('outcomeRating')),
+            otherResponse: parseInt(formData.get('otherResponse')),
+            fearsJustified: formData.get('fearsJustified'),
+            confidenceImpact: formData.get('confidenceImpact')
+        };
+        
+        trustEntries.push(entry);
+        localStorage.setItem('trustEntries', JSON.stringify(trustEntries));
+        
+        event.target.reset();
+        event.target.querySelector('input[type="date"]').valueAsDate = new Date();
+        updateDashboard();
+    }
+
+    function handleCriticismSubmit(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const entry = {
+            date: formData.get('date'),
+            triggerType: formData.get('triggerType'),
+            trigger: formData.get('trigger'),
+            urgeLevel: parseInt(formData.get('urgeLevel')),
+            didPause: formData.get('didPause'),
+            techniques: Array.from(formData.getAll('techniques')),
+            alternative: formData.get('alternative'),
+            partnerResponse: parseInt(formData.get('partnerResponse'))
+        };
+        
+        criticismEntries.push(entry);
+        localStorage.setItem('criticismEntries', JSON.stringify(criticismEntries));
+        event.target.reset();
+        event.target.querySelector('input[type="date"]').valueAsDate = new Date();
+        updateDashboard();
+    }
+
+    function exportData() {
+        const data = {
+            trustEntries,
+            criticismEntries,
+            exportDate: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'schema-tracker-data.json';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+</body>
+</html>
